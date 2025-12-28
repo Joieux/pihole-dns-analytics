@@ -1,0 +1,98 @@
+# Pi-hole DNS Analytics Configuration
+# Optimized for Raspberry Pi Zero 2W (512MB RAM, 1GHz CPU)
+
+pihole:
+  log_path: /var/log/pihole.log
+  gravity_db: /etc/pihole/gravity.db
+
+database:
+  path: data/dns_logs.db
+  retention_days: 30  # Reduced from 90 to save space
+  
+  # Pi Zero 2W specific SQLite tuning
+  cache_size_kb: 2000  # 2MB cache (vs 10MB on Pi 4)
+  journal_mode: WAL    # Write-ahead logging for better concurrency
+  synchronous: NORMAL  # Balanced safety vs performance
+  page_size: 4096      # Match SD card block size
+  
+  # Auto-maintenance
+  vacuum_schedule: "0 3 * * 0"  # Weekly vacuum on Sundays at 3am
+  cleanup_schedule: "0 2 * * *"  # Daily cleanup at 2am
+
+dashboard:
+  port: 5000
+  host: 0.0.0.0
+  
+  # Pi Zero 2W performance settings
+  cache_timeout: 10     # Cache API results for 10 seconds
+  max_recent_queries: 50  # Show only 50 recent queries (vs 100)
+  auto_refresh: 15      # Dashboard auto-refresh in seconds
+  
+  # Resource limits
+  max_workers: 1        # Single worker process
+  threaded: true        # Use threads not processes
+  debug: false          # Disable debug mode
+
+parser:
+  # Batch settings for efficient I/O
+  batch_size: 50        # Write to DB every 50 queries
+  batch_interval: 30    # Or every 30 seconds
+  buffer_max: 100       # Maximum queries in memory
+  
+  # Performance tuning
+  poll_interval: 0.5    # Log check interval in seconds
+  
+  # Memory management
+  max_memory_mb: 100    # Maximum memory usage
+  
+logging:
+  level: INFO           # INFO, WARNING, ERROR
+  file: data/analytics.log
+  max_size_mb: 10       # Rotate after 10MB
+  backup_count: 3       # Keep 3 old logs
+
+alerts:
+  enable: false         # Disabled by default on Pi Zero 2W
+  threshold_blocked: 100  # Alert if >100 blocks in 1 hour
+  threshold_queries: 1000  # Alert if >1000 queries in 1 hour
+  email: null
+  
+threat_detection:
+  enable: true
+  
+  # Lightweight threat detection
+  entropy_threshold: 3.5     # Shannon entropy for DGA detection
+  suspicious_tlds:
+    - tk
+    - ml
+    - ga
+    - cf
+    - gq
+  
+  # Reduced processing for Pi Zero 2W
+  check_interval: 300   # Check every 5 minutes (vs 1 minute)
+  max_domains_check: 100  # Process 100 domains per check (vs 1000)
+
+# System resource monitoring
+monitoring:
+  enable: true
+  check_interval: 60    # Check every minute
+  
+  # Alert thresholds
+  max_memory_percent: 85
+  max_cpu_percent: 80
+  max_disk_percent: 90
+
+# Performance optimizations
+optimization:
+  # SD card wear reduction
+  reduce_writes: true
+  batch_commits: true
+  
+  # Memory optimizations
+  aggressive_cleanup: true
+  gc_interval: 300      # Python garbage collection every 5 minutes
+  
+  # CPU optimizations
+  nice_value: 10        # Lower process priority
+  ionice_class: "idle"  # Idle I/O priority

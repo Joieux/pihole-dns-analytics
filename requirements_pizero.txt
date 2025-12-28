@@ -1,0 +1,26 @@
+# Pi-hole DNS Analytics - Raspberry Pi Zero 2W Requirements
+# Minimal dependencies for 512MB RAM
+
+# Core dependencies
+PyYAML==6.0.1       # Config file parsing
+Flask==3.0.0        # Lightweight web framework
+
+# Flask is minimal and brings in:
+# - Werkzeug (WSGI utility)
+# - Jinja2 (templating)
+# - Click (CLI)
+# - MarkupSafe (string escaping)
+
+# NOT included (already in Python 3.9+):
+# - sqlite3 (built-in)
+# - collections (built-in)
+# - datetime (built-in)
+# - signal (built-in)
+# - time (built-in)
+# - re (built-in)
+
+# Installation tips for Pi Zero 2W:
+# pip3 install --user --no-cache-dir -r requirements_pizero.txt
+#
+# --user: Install to user directory (no sudo needed)
+# --no-cache-dir: Don't cache packages (saves ~50MB disk)

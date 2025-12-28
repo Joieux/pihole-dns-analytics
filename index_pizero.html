@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi-hole Analytics | Pi Zero 2W</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 10px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .stat-card.blocked {
+            border-left-color: #ef4444;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .chart-container {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        
+        canvas {
+            max-height: 300px;
+        }
+        
+        .table-container {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        
+        th {
+            background: #0f172a;
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .domain {
+            font-family: monospace;
+            color: #60a5fa;
+        }
+        
+        .count {
+            font-weight: bold;
+            color: #34d399;
+        }
+        
+        .blocked-badge {
+            background: #ef4444;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        
+        .allowed-badge {
+            background: #10b981;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        
+        .timestamp {
+            color: #64748b;
+            font-size: 12px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+            
+            canvas {
+                max-height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Pi-hole DNS Analytics</h1>
+            <div class="subtitle">Optimized for Raspberry Pi Zero 2W</div>
+        </header>
+        
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Queries (24h)</div>
+                <div class="stat-value" id="total-queries">-</div>
+            </div>
+            <div class="stat-card blocked">
+                <div class="stat-label">Blocked Queries</div>
+                <div class="stat-value" id="blocked-queries">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Block Rate</div>
+                <div class="stat-value" id="block-rate">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Unique Domains</div>
+                <div class="stat-value" id="unique-domains">-</div>
+            </div>
+        </div>
+        
+        <!-- Timeline Chart -->
+        <div class="chart-container">
+            <div class="chart-title">📈 Query Timeline (24h)</div>
+            <canvas id="timeline-chart"></canvas>
+        </div>
+        
+        <!-- Top Domains -->
+        <div class="table-container">
+            <div class="chart-title">🔝 Top Queried Domains</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Queries</th>
+                    </tr>
+                </thead>
+                <tbody id="top-domains">
+                    <tr><td colspan="2" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Top Blocked -->
+        <div class="table-container">
+            <div class="chart-title">🚫 Top Blocked Domains</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Blocks</th>
+                    </tr>
+                </thead>
+                <tbody id="top-blocked">
+                    <tr><td colspan="2" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Recent Queries -->
+        <div class="table-container">
+            <div class="chart-title">🕐 Recent Queries (Last 50)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Domain</th>
+                        <th>Client</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-queries">
+                    <tr><td colspan="4" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <footer>
+            <p>Pi-hole DNS Analytics Dashboard | Optimized for Pi Zero 2W</p>
+            <p>Auto-refresh: 15 seconds | Data retention: 30 days</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Chart instance
+        let timelineChart = null;
+        
+        // Fetch and update stats
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('total-queries').textContent = data.total_queries.toLocaleString();
+                document.getElementById('blocked-queries').textContent = data.blocked_queries.toLocaleString();
+                document.getElementById('block-rate').textContent = data.blocked_percentage + '%';
+                document.getElementById('unique-domains').textContent = data.unique_domains.toLocaleString();
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+        
+        // Update timeline chart
+        async function updateTimeline() {
+            try {
+                const response = await fetch('/api/timeline');
+                const data = await response.json();
+                
+                const labels = data.map(d => {
+                    const date = new Date(d.timestamp * 1000);
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                });
+                
+                const ctx = document.getElementById('timeline-chart').getContext('2d');
+                
+                if (timelineChart) {
+                    timelineChart.destroy();
+                }
+                
+                timelineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Total Queries',
+                            data: data.map(d => d.total),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
+                        }, {
+                            label: 'Blocked',
+                            data: data.map(d => d.blocked),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#e2e8f0' }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: '#94a3b8' },
+                                grid: { color: '#334155' }
+                            },
+                            x: {
+                                ticks: { color: '#94a3b8', maxRotation: 0 },
+                                grid: { color: '#334155' }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching timeline:', error);
+            }
+        }
+        
+        // Update top domains
+        async function updateTopDomains() {
+            try {
+                const response = await fetch('/api/top-domains');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('top-domains');
+                tbody.innerHTML = data.map(d => `
+                    <tr>
+                        <td class="domain">${d.domain}</td>
+                        <td class="count">${d.count.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching top domains:', error);
+            }
+        }
+        
+        // Update top blocked
+        async function updateTopBlocked() {
+            try {
+                const response = await fetch('/api/top-blocked');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('top-blocked');
+                tbody.innerHTML = data.map(d => `
+                    <tr>
+                        <td class="domain">${d.domain}</td>
+                        <td class="count">${d.count.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching blocked domains:', error);
+            }
+        }
+        
+        // Update recent queries
+        async function updateRecentQueries() {
+            try {
+                const response = await fetch('/api/recent');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('recent-queries');
+                tbody.innerHTML = data.map(q => {
+                    const time = new Date(q.timestamp * 1000).toLocaleTimeString();
+                    const badge = q.blocked ? 
+                        '<span class="blocked-badge">BLOCKED</span>' : 
+                        '<span class="allowed-badge">ALLOWED</span>';
+                    
+                    return `
+                        <tr>
+                            <td class="timestamp">${time}</td>
+                            <td class="domain">${q.domain}</td>
+                            <td>${q.client || 'N/A'}</td>
+                            <td>${badge}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error fetching recent queries:', error);
+            }
+        }
+        
+        // Update all data
+        function updateDashboard() {
+            updateStats();
+            updateTimeline();
+            updateTopDomains();
+            updateTopBlocked();
+            updateRecentQueries();
+        }
+        
+        // Initial load
+        updateDashboard();
+        
+        // Auto-refresh every 15 seconds (lighter on Pi Zero 2W)
+        setInterval(updateDashboard, 15000);
+    </script>
+</body>
+</html>
