@@ -91,7 +91,7 @@ On a Raspberry Pi Zero 2W:
 curl -sSL https://install.pi-hole.net | bash
 
 # 2. Clone this project
-git clone https://github.com/yourusername/pihole-analytics-pizero
+git clone https://github.com/joieuc/pihole-analytics-pizero
 cd pihole-analytics-pizero
 
 # 3. Install dependencies
